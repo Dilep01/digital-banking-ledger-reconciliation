@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:55438/ledger_test
+    username: ledger_app
+    password: local_demo_only
+  flyway:
+    url: jdbc:postgresql://127.0.0.1:55438/ledger_test
+    user: ledger_owner
+    password: local_owner_only
+app:
+  demo: false
+  worker-enabled: false

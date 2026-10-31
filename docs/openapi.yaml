@@ -1,0 +1,563 @@
+openapi: 3.1.0
+info:
+  title: Digital Banking Ledger API
+  version: 1.0.0
+  description: >-
+    Local simulated INR banking. Amounts are decimal strings. Obtain a CSRF token
+    before state changes, log in with form credentials, then obtain a fresh token.
+    The HttpOnly SESSION cookie authenticates later requests. No real payments.
+servers:
+  - url: http://127.0.0.1:8080/api/v1
+security:
+  - cookieAuth: []
+tags:
+  - name: Identity
+  - name: Accounts
+  - name: Transfers
+  - name: Reconciliation
+  - name: Review
+  - name: Audit
+  - name: Jobs
+paths:
+  /auth/csrf:
+    get:
+      tags: [Identity]
+      summary: Get the current session's CSRF token and header name
+      security: []
+      responses:
+        "200":
+          description: Token; retain the accompanying session cookie
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, headerName]
+                properties:
+                  token: { type: string }
+                  headerName: { type: string, const: X-CSRF-TOKEN }
+  /auth/register:
+    post:
+      tags: [Identity]
+      summary: Register a customer; supplied staff roles are ignored
+      security: [{ csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 80 }
+                email: { type: string, format: email, maxLength: 180 }
+                password: { type: string, minLength: 12, maxLength: 64 }
+      responses:
+        "201": { $ref: "#/components/responses/Record" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+  /auth/login:
+    post:
+      tags: [Identity]
+      summary: Authenticate and rotate the session
+      security: [{ csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+        "401": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+  /auth/logout:
+    post:
+      tags: [Identity]
+      summary: Invalidate the shared session
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      responses:
+        "204": { description: Session invalidated; no response body }
+  /auth/me:
+    get:
+      tags: [Identity]
+      summary: Current identity and role
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+        "401": { $ref: "#/components/responses/Problem" }
+  /overview:
+    get:
+      tags: [Accounts]
+      summary: Role-scoped accounts, counts, recent records, and event inbox
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+  /accounts:
+    get:
+      tags: [Accounts]
+      summary: Owned customer accounts, or up to 200 accounts for staff
+      responses:
+        "200": { $ref: "#/components/responses/Rows" }
+    post:
+      tags: [Accounts]
+      summary: Open a zero-balance customer account; at most five per customer
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      requestBody: { $ref: "#/components/requestBodies/AccountName" }
+      responses:
+        "201": { $ref: "#/components/responses/Record" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /accounts/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [Accounts]
+      summary: Account details; customers require ownership
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+        "404": { $ref: "#/components/responses/Problem" }
+  /accounts/{id}/balance:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [Accounts]
+      summary: Account record including exact decimal-string balance
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+        "404": { $ref: "#/components/responses/Problem" }
+  /accounts/{id}/freeze:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    post:
+      tags: [Accounts]
+      summary: Operator freezes an account with a reason
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      requestBody: { $ref: "#/components/requestBodies/Reason" }
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+        "403": { $ref: "#/components/responses/Problem" }
+  /accounts/{id}/unfreeze:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    post:
+      tags: [Accounts]
+      summary: Operator unfreezes an account with a reason
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      requestBody: { $ref: "#/components/requestBodies/Reason" }
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+        "403": { $ref: "#/components/responses/Problem" }
+  /accounts/{id}/transactions:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [Accounts]
+      summary: Newest-first ledger-derived account history
+      parameters:
+        - {
+            name: page,
+            in: query,
+            schema: { type: integer, minimum: 0, maximum: 10000, default: 0 },
+          }
+        - {
+            name: size,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 100, default: 20 },
+          }
+        - { $ref: "#/components/parameters/Start" }
+        - { $ref: "#/components/parameters/End" }
+      responses:
+        "200": { $ref: "#/components/responses/Rows" }
+  /accounts/{id}/statement.csv:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [Accounts]
+      summary: Download up to 5,000 entries; includes opening funding
+      parameters:
+        [
+          { $ref: "#/components/parameters/Start" },
+          { $ref: "#/components/parameters/End" },
+        ]
+      responses:
+        "200":
+          description: CSV statement; text fields neutralize spreadsheet formula prefixes
+          content: { text/csv: { schema: { type: string } } }
+        "400": { $ref: "#/components/responses/Problem" }
+  /transfers:
+    post:
+      tags: [Transfers]
+      summary: Post an atomic internal transfer; customer role required
+      description: >-
+        Same caller, operation and key with the same normalized intent replay the saved
+        result. Changed intent returns 409. A saved 422 rejection requires a new key
+        for a later intentional attempt. Retry uncertainty with the same key.
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/Transfer" } },
+          }
+      responses:
+        "201": { $ref: "#/components/responses/Record" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
+  /transfers/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [Transfers]
+      summary: Transfer details for either customer participant or staff
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+        "404": { $ref: "#/components/responses/Problem" }
+  /transfer-requests/{key}:
+    parameters:
+      - {
+          name: key,
+          in: path,
+          required: true,
+          schema: { type: string, maxLength: 100 },
+        }
+    get:
+      tags: [Transfers]
+      summary: Look up the caller's saved transfer result by key
+      description: A 404 is not proof that an in-flight transfer will fail. UUID keys are recommended.
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+        "404": { $ref: "#/components/responses/Problem" }
+  /scheduled-transfers:
+    get:
+      tags: [Jobs]
+      summary: Own schedules for customers; recent schedules for staff
+      responses:
+        "200": { $ref: "#/components/responses/Rows" }
+    post:
+      tags: [Jobs]
+      summary: Create an idempotent schedule without reserving funds
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                [
+                  sourceAccountId,
+                  destinationAccountRef,
+                  amount,
+                  description,
+                  dueAt,
+                ]
+              properties:
+                sourceAccountId: { type: string, format: uuid }
+                destinationAccountRef: { type: string, maxLength: 45 }
+                amount: { $ref: "#/components/schemas/Money" }
+                description: { type: string, minLength: 1, maxLength: 160 }
+                dueAt:
+                  {
+                    type: string,
+                    format: date-time,
+                    description: Between five seconds and 365 days in the future,
+                  }
+      responses:
+        "201": { $ref: "#/components/responses/Record" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /scheduled-transfers/{id}/cancel:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    post:
+      tags: [Jobs]
+      summary: Customer cancels an owned pending schedule
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /ops/statement-imports:
+    get:
+      tags: [Reconciliation]
+      summary: Staff list imports and row-validation counts
+      responses:
+        "200": { $ref: "#/components/responses/Rows" }
+    post:
+      tags: [Reconciliation]
+      summary: Operator stages a synthetic statement; maximum 1 MB and 2,000 rows
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                source: { type: string, default: SYNTHETIC, maxLength: 60 }
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+        "400": { $ref: "#/components/responses/Problem" }
+  /ops/statement-imports/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [Reconciliation]
+      summary: Staff inspect import evidence and original row details
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+  /ops/reconciliation-runs:
+    get:
+      tags: [Reconciliation]
+      summary: Staff list recent immutable-result runs
+      responses:
+        "200": { $ref: "#/components/responses/Rows" }
+    post:
+      tags: [Reconciliation]
+      summary: Operator compares statement legs or scans full internal integrity
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [start, end]
+              properties:
+                importId:
+                  {
+                    type: [string, "null"],
+                    format: uuid,
+                    description: Omit for full internal integrity scan,
+                  }
+                start: { type: string, format: date-time }
+                end: { type: string, format: date-time }
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+        "400": { $ref: "#/components/responses/Problem" }
+  /ops/reconciliation-runs/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [Reconciliation]
+      summary: Run metadata, exceptions, and the persisted internal snapshot
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+  /ops/reconciliation-exceptions:
+    get:
+      tags: [Reconciliation]
+      summary: Staff list recent exceptions
+      parameters:
+        - { name: runId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        "200": { $ref: "#/components/responses/Rows" }
+  /ops/reconciliation-exceptions/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [Reconciliation]
+      summary: Exception evidence, linked journal leg, and investigation history
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+  /ops/reconciliation-exceptions/{id}/events:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    post:
+      tags: [Review]
+      summary: Operator records investigation or dismissal
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state, note]
+              properties:
+                state: { type: string, enum: [INVESTIGATING, DISMISSED] }
+                note: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /ops/correction-requests:
+    get:
+      tags: [Review]
+      summary: Staff inspect requested full reversals and decisions
+      responses:
+        "200": { $ref: "#/components/responses/Rows" }
+    post:
+      tags: [Review]
+      summary: Operator requests reversal of an original transfer
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [journalId, reason]
+              properties:
+                journalId: { type: string, format: uuid }
+                exceptionId: { type: [string, "null"], format: uuid }
+                reason: { type: string, minLength: 1, maxLength: 300 }
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /ops/correction-requests/{id}/approve:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    post:
+      tags: [Review]
+      summary: A different approver posts a full reversal if financial rules permit
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      requestBody: { $ref: "#/components/requestBodies/Reason" }
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /ops/correction-requests/{id}/reject:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    post:
+      tags: [Review]
+      summary: A different approver rejects a correction with a reason
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      requestBody: { $ref: "#/components/requestBodies/Reason" }
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+  /audit/events:
+    get:
+      tags: [Audit]
+      summary: Staff search recorded actions and targets
+      parameters:
+        - {
+            name: page,
+            in: query,
+            schema: { type: integer, minimum: 0, maximum: 10000, default: 0 },
+          }
+        - { name: search, in: query, schema: { type: string, maxLength: 100 } }
+      responses:
+        "200": { $ref: "#/components/responses/Rows" }
+  /audit/journals:
+    get:
+      tags: [Audit]
+      summary: Staff list up to 200 recent posted journals
+      responses:
+        "200": { $ref: "#/components/responses/Rows" }
+  /audit/journals/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [Audit]
+      summary: Staff inspect a journal and its account entries
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+  /ops/jobs:
+    get:
+      tags: [Jobs]
+      summary: Staff inspect recent event delivery and scheduled work
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+  /ops/outbox/{id}/retry:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    post:
+      tags: [Jobs]
+      summary: Operator requeues a failed event without changing its identity
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Record" }
+        "409": { $ref: "#/components/responses/Problem" }
+components:
+  securitySchemes:
+    cookieAuth: { type: apiKey, in: cookie, name: SESSION }
+    csrfToken: { type: apiKey, in: header, name: X-CSRF-TOKEN }
+  parameters:
+    Id:
+      {
+        name: id,
+        in: path,
+        required: true,
+        schema: { type: string, format: uuid },
+      }
+    IdempotencyKey:
+      {
+        name: Idempotency-Key,
+        in: header,
+        required: true,
+        schema: { type: string, minLength: 1, maxLength: 100 },
+      }
+    Start:
+      {
+        name: start,
+        in: query,
+        description: Inclusive UTC instant; defaults to one year ago,
+        schema: { type: string, format: date-time },
+      }
+    End:
+      {
+        name: end,
+        in: query,
+        description: Exclusive UTC instant; defaults to the current time plus one second,
+        schema: { type: string, format: date-time },
+      }
+  schemas:
+    Money:
+      {
+        type: string,
+        pattern: '^[0-9]{1,7}(\.[0-9]{1,2})?$',
+        description: Positive INR amount up to 1000000.00; no rounding,
+      }
+    Transfer:
+      type: object
+      required: [sourceAccountId, destinationAccountRef, amount, currency]
+      properties:
+        sourceAccountId: { type: string, format: uuid }
+        destinationAccountRef: { type: string, minLength: 1, maxLength: 45 }
+        amount: { $ref: "#/components/schemas/Money" }
+        currency: { type: string, const: INR }
+        description: { type: string, maxLength: 160 }
+    Record: { type: object, additionalProperties: true }
+    Problem:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        correlationId: { type: string }
+  responses:
+    Record:
+      description: Record returned; monetary fields are decimal strings
+      content:
+        {
+          application/json: { schema: { $ref: "#/components/schemas/Record" } },
+        }
+    Rows:
+      description: Bounded list of records
+      content:
+        {
+          application/json:
+            {
+              schema:
+                { type: array, items: { $ref: "#/components/schemas/Record" } },
+            },
+        }
+    Problem:
+      description: Rejection or failure; preserve a transfer's key when its outcome is uncertain
+      content:
+        {
+          application/json:
+            { schema: { $ref: "#/components/schemas/Problem" } },
+        }
+  requestBodies:
+    Reason:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [reason]
+            properties:
+              reason: { type: string, minLength: 1, maxLength: 300 }
+    AccountName:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name]
+            properties:
+              name: { type: string, minLength: 1, maxLength: 80 }

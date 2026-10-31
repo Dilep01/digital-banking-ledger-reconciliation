@@ -1,0 +1,25 @@
+{
+  "environment": {
+    "platform": "win32",
+    "cpu": "AMD Ryzen 5 5600U with Radeon Graphics         ",
+    "logicalCPUs": 12,
+    "memoryGB": 15,
+    "node": "v24.18.0"
+  },
+  "checks": [
+    "Database-backed session works across two JVMs",
+    "50 simultaneous same-key requests across two JVMs produce one transfer",
+    "20 competing debits from INR 1,000: ten post, ten reject, balance zero",
+    "First JVM stopped after committing the scheduled job",
+    "Surviving JVM completes the persisted schedule once after the first JVM stops",
+    "Shared session is invalid after logout"
+  ],
+  "measuredAt": "2026-10-28T17:37:36.580Z",
+  "duplicateBurst": {
+    "requests": 50,
+    "wallMs": 945,
+    "p50Ms": 847,
+    "p95Ms": 878
+  },
+  "passed": true
+}

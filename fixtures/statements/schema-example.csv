@@ -1,0 +1,3 @@
+external_reference,account_ref,booking_time,signed_amount,currency
+DEMO-T001,DEMO-ALICE,2026-10-28T09:30:00Z,-500.00,INR
+DEMO-T001,DEMO-BOB,2026-10-28T09:30:00Z,500.00,INR

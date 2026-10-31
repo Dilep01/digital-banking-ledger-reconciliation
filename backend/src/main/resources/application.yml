@@ -1,0 +1,52 @@
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${PORT:8080}
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true
+        same-site: strict
+        secure: ${COOKIE_SECURE:false}
+spring:
+  application:
+    name: banking-ledger
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:55438/ledger}
+    username: ${DB_USER:ledger_app}
+    password: ${DB_PASSWORD:local_demo_only}
+    hikari:
+      maximum-pool-size: 16
+      connection-timeout: 5000
+      connection-init-sql: SET statement_timeout = '15s'
+  flyway:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:55438/ledger}
+    user: ${DB_OWNER:ledger_owner}
+    password: ${DB_OWNER_PASSWORD:local_owner_only}
+  session:
+    jdbc:
+      initialize-schema: never
+    timeout: 30m
+  servlet:
+    multipart:
+      max-file-size: 1MB
+      max-request-size: 1MB
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: never
+app:
+  demo: ${DEMO_MODE:false}
+  demo-password: ${DEMO_PASSWORD:DemoBank!2026}
+  worker-enabled: ${WORKER_ENABLED:true}
+  worker-delay: ${WORKER_DELAY:2000}
+logging:
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss} %-5level [%X{correlationId}] %logger{30} - %msg%n'

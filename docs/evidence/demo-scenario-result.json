@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "batch": "1793248768960",
+  "directory": ".runtime/generated-statements/1793248768960/",
+  "runs": [
+    {
+      "name": "clean",
+      "id": "250c24dd-b027-411f-b68b-c647bd14cfc4",
+      "matched": 4,
+      "exceptions": 0
+    },
+    {
+      "name": "anomalies",
+      "id": "d76106f6-fa20-4fc9-a0d9-a9d1e7e9b0f7",
+      "matched": 1,
+      "exceptions": 4
+    }
+  ],
+  "integrityFindings": 0
+}

@@ -1,0 +1,5 @@
+DO $$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='ledger_app') THEN
+  CREATE ROLE ledger_app LOGIN PASSWORD 'local_demo_only' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+ END IF;
+END $$;

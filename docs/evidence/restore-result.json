@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "database": "ledger_restore_20261029102230",
+  "dump": ".runtime/backups/ledger-20261029-102229.dump",
+  "fingerprint": {
+    "journals": 11,
+    "entries": 22,
+    "debits": "6811.72",
+    "credits": "6811.72",
+    "balances": "fee438d248353dd2805334edf99983a8",
+    "audit": 57
+  }
+}

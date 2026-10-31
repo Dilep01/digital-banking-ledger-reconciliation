@@ -1,0 +1,66 @@
+{
+  "collectedAt": "2026-10-29T04:55:36.557Z",
+  "backend": {
+    "passed": 62,
+    "suites": [
+      {
+        "name": "BankingIntegrationTest",
+        "tests": 47,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "MoneyTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ]
+  },
+  "frontend": {
+    "passed": 7
+  },
+  "apiContract": {
+    "version": "3.1.0",
+    "paths": 33,
+    "validated": true
+  },
+  "packagedBrowser": {
+    "baseURL": "http://127.0.0.1:8080",
+    "passed": 5,
+    "tests": [
+      {
+        "title": "customer dashboard, exact transfer, history and logout",
+        "status": "passed",
+        "durationMs": 3769,
+        "project": "desktop"
+      },
+      {
+        "title": "staff can request and independently approve a full reversal",
+        "status": "passed",
+        "durationMs": 3088,
+        "project": "desktop"
+      },
+      {
+        "title": "statement upload, integrity run and exception evidence",
+        "status": "passed",
+        "durationMs": 2606,
+        "project": "desktop"
+      },
+      {
+        "title": "mobile navigation and account reference fit the viewport",
+        "status": "passed",
+        "durationMs": 1583,
+        "project": "desktop"
+      },
+      {
+        "title": "lost response recovers the same transfer without a second debit",
+        "status": "passed",
+        "durationMs": 1780,
+        "project": "desktop"
+      }
+    ]
+  }
+}
